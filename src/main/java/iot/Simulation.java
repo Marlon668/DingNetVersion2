@@ -18,6 +18,7 @@ import selfadaptation.feedbackloop.GenericFeedbackLoop;
 import util.Connection;
 import util.TimeHelper;
 
+import javax.swing.*;
 import java.lang.ref.WeakReference;
 import java.time.LocalTime;
 import java.util.*;
@@ -321,18 +322,23 @@ public class Simulation {
     public boolean isFinished() {
         if(!this.continueSimulation.test(this.getEnvironment()) && this.finished == false)
         {
-            getEnvironment().getMotes().stream()
-                .filter(mote -> mote instanceof UserMote)
-                .forEach(mote ->{
-                    System.out.println(mote.getEUI() + "  :    " + routeEvaluator.getTotalCostPath(mote.getEUI()));
-                });
+            String message = "";
+            for(Mote mote: getEnvironment().getMotes())
+            {
+                if(mote instanceof UserMote)
+                {
+                    message += mote.getEUI() +  "  :    " + routeEvaluator.getTotalCostPath(mote.getEUI())+ "\n";
+                }
+            }
+            JOptionPane.showMessageDialog(null, message, "Results", JOptionPane.INFORMATION_MESSAGE);
             this.finished = true;
         }
         if(!(getApproach() == null) && getApproach().getName()=="Get Information")
         {
             if(time/1000 >= 4000)
             {
-                System.out.println("Finished");
+                String message = "Finished \nPress on save to write the information about the evolution of the values for all connections on a xml-file";
+                JOptionPane.showMessageDialog(null, message, "Information gathered", JOptionPane.INFORMATION_MESSAGE);
                 return true;
             }
         }
@@ -344,6 +350,7 @@ public class Simulation {
 
 
     private void setupSimulation(Predicate<Environment> pred) {
+        this.finished = false;
         this.time = 0;
         this.information = new HashMap<>();
         this.wayPointMap = new HashMap<>();
