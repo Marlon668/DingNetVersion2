@@ -170,6 +170,7 @@ public class ConfigurationReader {
             // ---------------
 
             if (configuration.getElementsByTagName("information").getLength() != 0) {
+                simulationRunner.activateBestpath();
                 Element information = (Element) configuration.getElementsByTagName("information").item(0);
                 Element connectionNode;
 
@@ -188,6 +189,9 @@ public class ConfigurationReader {
                     }
                     simulationRunner.getSimulation().getInformation().put(connectionId,values);
                 }
+            }
+            else{
+                simulationRunner.deactivateBestpath();
             }
 
         } catch (ParserConfigurationException | SAXException | IOException e1) {

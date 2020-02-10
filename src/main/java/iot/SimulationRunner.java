@@ -25,6 +25,7 @@ import util.Statistics;
 import util.xml.*;
 
 import javax.sound.midi.SysexMessage;
+import javax.swing.*;
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -49,6 +50,19 @@ public class SimulationRunner {
 
     private RoutingApplication routingApplication2;
 
+    private Boolean bestpathAvailable;
+
+
+    public void activateBestpath()
+    {
+        bestpathAvailable = true;
+    }
+
+    public void deactivateBestpath()
+    {
+        bestpathAvailable = false;
+    }
+
 
 
     public static SimulationRunner getInstance() {
@@ -68,6 +82,7 @@ public class SimulationRunner {
         pollutionGrid = new PollutionGrid();
         simulation = new Simulation(pollutionGrid);
         inputProfiles = loadInputProfiles();
+        bestpathAvailable = false;
 
         // Loading all the algorithms
         GenericFeedbackLoop noAdaptation = new GenericFeedbackLoop("No Adaptation") {
@@ -188,21 +203,35 @@ public class SimulationRunner {
         }
 
         simulation.setApproach(selectedAlgorithm);
-        for(Mote mote: environment.getMotes())
+        if(selectedAlgorithm.getName() == "Best Path")
         {
+            if(this.bestpathAvailable == true) {
+                for (Mote mote : environment.getMotes()) {
 
-            //if (mote instanceof UserMote && ((UserMote) mote).isActive())
-            //{
-            //    MoteEffector moteEffector = new MoteEffector();
-            //    moteEffector.changePath(mote,new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),environment);
-            //}
+                    //if (mote instanceof UserMote && ((UserMote) mote).isActive())
+                    //{
+                    //    MoteEffector moteEffector = new MoteEffector();
+                    //    moteEffector.changePath(mote,new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),environment);
+                    //}
 
-            if (mote instanceof UserMote && ((UserMote) mote).isActive() && selectedAlgorithm.getName() == "Best Path")
-            {
-                MoteEffector moteEffector = new MoteEffector();
-                BestPath bestpath = new BestPath(new SimplePollutionHeuristic(pollutionGrid));
-                bestpath.setInformation(simulation.getInformation());
-                moteEffector.bestPath(mote,bestpath,environment);
+                    if (mote instanceof UserMote && ((UserMote) mote).isActive()) {
+                        MoteEffector moteEffector = new MoteEffector();
+                        BestPath bestpath = new BestPath(new SimplePollutionHeuristic(pollutionGrid));
+                        bestpath.setInformation(simulation.getInformation());
+                        moteEffector.bestPath(mote, bestpath, environment);
+                    }
+
+                }
+            }
+            else{
+                String message = "No information about evolution of values of connections available in xml-file\n" +
+                    "To make this option available, do the following things\n" +
+                    "1. Gather information about values of connections by clicking \"Get Information\" in the simulation menu \n" +
+                    "2. Save the xml-file\n" +
+                    "3. Load the new xml-file\n" +
+                    "4. Select best-path algorithm in the simulation menu"
+                    ;
+                JOptionPane.showMessageDialog(null, message, "Lack of information", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -411,7 +440,6 @@ public class SimulationRunner {
                 MoteEffector moteEffector = new MoteEffector();
                 moteEffector.changePath(mote,new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),environment);
             }
-
 
         }
         //this.routingApplication = new RoutingApplication2 (new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),getEnvironment());

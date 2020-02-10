@@ -322,12 +322,12 @@ public class Simulation {
     public boolean isFinished() {
         if(!this.continueSimulation.test(this.getEnvironment()) && this.finished == false)
         {
-            String message = "";
+            String message = "Evaluation of the path \n";
             for(Mote mote: getEnvironment().getMotes())
             {
                 if(mote instanceof UserMote)
                 {
-                    message += mote.getEUI() +  "  :    " + routeEvaluator.getTotalCostPath(mote.getEUI())+ "\n";
+                    message += "EUI: " + mote.getEUI() +  "  :    " + routeEvaluator.getTotalCostPath(mote.getEUI())+ "\n";
                 }
             }
             JOptionPane.showMessageDialog(null, message, "Results", JOptionPane.INFORMATION_MESSAGE);
