@@ -6,6 +6,7 @@ import application.routing.RoutingApplication2;
 import application.routing.RoutingApplicationNew;
 import gui.mapviewer.*;
 import iot.Environment;
+import iot.Simulation;
 import iot.networkentity.Mote;
 import iot.networkentity.UserMote;
 import org.jxmapviewer.JXMapViewer;
@@ -13,6 +14,7 @@ import org.jxmapviewer.painter.CompoundPainter;
 import org.jxmapviewer.painter.Painter;
 import org.jxmapviewer.viewer.DefaultWaypoint;
 import org.jxmapviewer.viewer.Waypoint;
+import selfadaptation.feedbackloop.GenericFeedbackLoop;
 import util.GraphStructure;
 
 import java.awt.*;
@@ -101,7 +103,7 @@ public class CompoundPainterBuilder {
      * @param environment The environment which contains all the motes.
      * @return The current object.
      */
-    public CompoundPainterBuilder withMotePaths(Environment environment) {
+    public CompoundPainterBuilder withMotePaths(Environment environment, GenericFeedbackLoop approach) {
         Color lineColor = GUISettings.MOTE_PATH_LINE_COLOR;
         int lineSize = GUISettings.MOTE_PATH_LINE_SIZE;
 
@@ -109,7 +111,19 @@ public class CompoundPainterBuilder {
         for(Mote m : environment.getMotes())
             if(m instanceof  UserMote)
             {
-                painters.add(new LinePainter(m.getPath().getWayPoints(), lineColor, lineSize));
+                if(!(approach == null))
+                {
+                    if(approach.getName()=="Best Path")
+                    {
+                        painters.add(new LinePainter(m.getPath().getWayPoints(), Color.MAGENTA, lineSize));
+                    }
+                    else{
+                        painters.add(new LinePainter(m.getPath().getWayPoints(), lineColor, lineSize));
+                    }
+                }
+                else{
+                    painters.add(new LinePainter(m.getPath().getWayPoints(), lineColor, lineSize));
+                }
             }
             else
             {
@@ -142,8 +156,10 @@ public class CompoundPainterBuilder {
         // Optional painter of the complete path
         environment.getMotes().stream()
             .filter(m -> m instanceof UserMote && ((UserMote) m).isActive() && ((UserMote) m).isAdaptation())
-            .findFirst()
-            .ifPresent(m -> painters.add(new LinePainter(routingApplication.getRoute(m), lineColor, lineSize)));
+            .forEach(m-> {
+                painters.add(new LinePainter(routingApplication.getRoute(m), lineColor, lineSize));
+            });
+            //.ifPresent(m -> painters.add(new LinePainter(routingApplication.getRoute(m), lineColor, lineSize)));
         return this;
     }
 

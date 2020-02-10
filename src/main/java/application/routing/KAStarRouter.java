@@ -26,6 +26,11 @@ public class KAStarRouter implements PathFinder {
     // The heuristic used in the A* algorithm
     private RoutingHeuristic heuristic;
 
+    public RoutingHeuristic getHeuristic ()
+    {
+        return this.heuristic;
+    }
+
 
     public KAStarRouter(RoutingHeuristic heuristic) {
         this.heuristic = heuristic;
@@ -33,8 +38,8 @@ public class KAStarRouter implements PathFinder {
 
 
     @Override
-    public List<GeoPosition> retrievePath(GraphStructure graph, GeoPosition begin, GeoPosition end){
-        return retrieveKPaths(graph,begin,end,1).get(0).getRight();
+    public Pair<Double,List<GeoPosition>> retrievePath(GraphStructure graph, GeoPosition begin, GeoPosition end){
+        return retrieveKPaths(graph,begin,end,1).get(0);
     }
     @Override
     public List<Pair<Double,List<GeoPosition>>> retrieveKPaths(GraphStructure graph, GeoPosition begin, GeoPosition end, Integer amountBestPaths) {
@@ -49,13 +54,15 @@ public class KAStarRouter implements PathFinder {
 
         HashMap<Long, Integer> amountConnectionUsed = new HashMap<>();
 
+        Integer totalPaths = amountBestPaths;
+
         PriorityQueue<FringeEntry> fringe = new PriorityQueue<>();
         // Initialize the fringe by adding the first outgoing connections
         graph.getConnections().entrySet().stream()
-            .filter(entry -> entry.getValue().getFrom() == beginWaypointId)
+            .filter(entry -> entry.getValue().getFrom() == beginWaypointId || entry.getValue().getTo() == beginWaypointId)
             .forEach(entry -> {
                 double accumulatedCost = this.heuristic.calculateAccumulatedCost(new HeuristicEntry(graph, entry.getValue(), end));
-                double distanceToDestination = MapHelper.distance(graph.getWayPoint(entry.getValue().getTo()), end);
+                //double distanceToDestination = MapHelper.distance(graph.getWayPoint(entry.getValue().getTo()), end);
                 fringe.add(new FringeEntry(
                     List.of(entry.getKey()),
                     accumulatedCost, //+ distanceToDestination,
@@ -79,43 +86,58 @@ public class KAStarRouter implements PathFinder {
 
                 // Are we at the destination?
                 if (lastWaypointId == endWaypointId) {
+
                     Pair<Double, List<GeoPosition>> IBestPath = new Pair(current.heuristicValue, this.getPath(current.connections, graph, end));
                     KBestPaths.add(IBestPath);
                     amountBestPaths -= 1;
                     if (amountBestPaths == 0){
+                        //System.out.println("connections ");
+                        //System.out.println(current.connections);
+                        //System.out.println("klaar");
+                        //System.out.println(KBestPaths.get(KBestPaths.size()-1).getRight());
                         return KBestPaths;
                     }
                 else{
                         //visitedConnections.clear();
                         DeleteConnectionsInGraph(current.connections, visitedConnections, amountConnectionUsed, graph);
+                        //long cijfer = 636;
+                        //System.out.println("ttt  "  + cijfer + "   " + amountConnectionUsed.get(cijfer));
+                        //System.out.println(visitedConnections.contains(1633));
                     }
                 }
 
+                if(!(lastWaypointId == endWaypointId))
+                {
+                    // Explore the different outgoing connections from the last connection in the list
+                    // -> Add the new possible paths (together with their new heuristic values) to the fringe
+                    Integer finalAmountBestPaths = amountBestPaths;
+                    graph.getOutgoingConnectionsById(lastWaypointId).stream()
+                        .filter(connId -> !visitedConnections.contains(connId))// Filter out connections which we have already considered (since these were visited in a better path first)
+                        //.filter(connId -> !current.connections.contains(connId))
+                        .filter(connId ->   (finalAmountBestPaths == totalPaths) || !containsWaypoints(current.connections, connId, graph))
+                        .forEach(connId -> {
+                            List<Long> extendedPath = new ArrayList<>(current.connections);
+                            extendedPath.add(connId);
 
-                // Explore the different outgoing connections from the last connection in the list
-                // -> Add the new possible paths (together with their new heuristic values) to the fringe
-                graph.getOutgoingConnectionsById(lastWaypointId).stream()
-                    .filter(connId -> !visitedConnections.contains(connId))
-                    //.filter(connId -> !current.connections.contains(connId))
-                    .filter(connId -> !containsWaypoints(current.connections, connId, graph))// Filter out connections which we have already considered (since these were visited in a better path first)
-                    .forEach(connId -> {
-                        List<Long> extendedPath = new ArrayList<>(current.connections);
-                        extendedPath.add(connId);
+                            double accumulatedCost = current.accumulatedCost + this.heuristic.calculateAccumulatedCost(new HeuristicEntry(graph, graph.getConnection(connId), end));
+                            //double distanceToDestination = MapHelper.distance(graph.getWayPoint((graph.getConnection(connId).getTo())), end);
+                            double newHeuristicValue = accumulatedCost; //+ distanceToDestination;
 
-                        double accumulatedCost = current.accumulatedCost + this.heuristic.calculateAccumulatedCost(new HeuristicEntry(graph, graph.getConnection(connId), end));
-                        double distanceToDestination = MapHelper.distance(graph.getWayPoint((graph.getConnection(connId).getTo())), end);
-                        double newHeuristicValue = current.accumulatedCost; //+ distanceToDestination;
+                            fringe.add(new FringeEntry(extendedPath, newHeuristicValue, accumulatedCost));
+                            //System.out.println("bevat " + visitedConnections.contains(1633));
 
-                        fringe.add(new FringeEntry(extendedPath, newHeuristicValue, accumulatedCost));
-                        visitedConnections.add(connId);
-                        if (amountConnectionUsed.get(lastWaypointId) == null) {
-                            amountConnectionUsed.put(lastWaypointId, 1);
-                        } else {
-                            Integer amountConnections = amountConnectionUsed.get(lastWaypointId) + 1;
-                            amountConnectionUsed.put(lastWaypointId, amountConnections);
-                        }
+                            visitedConnections.add(connId);
+                            //System.out.println(connId == 1633);
+                            //System.out.println(graph.getConnection(1633).getTo() == endWaypointId);
+                            if (amountConnectionUsed.get(lastWaypointId) == null) {
+                                amountConnectionUsed.put(lastWaypointId, 1);
+                            } else {
+                                Integer amountConnections = amountConnectionUsed.get(lastWaypointId) + 1;
+                                amountConnectionUsed.put(lastWaypointId, amountConnections);
+                            }
 
-                    });
+                        });
+                }
             }
 
             throw new RuntimeException(String.format("Could not find a path from {%s} to {%s}", begin.toString(), end.toString()));
@@ -123,6 +145,7 @@ public class KAStarRouter implements PathFinder {
         }
         catch(RuntimeException e)
         {
+
             return KBestPaths;
         }
     }
@@ -139,24 +162,29 @@ public class KAStarRouter implements PathFinder {
         return false;
     }
     private void DeleteConnectionsInGraph(List<Long> connections, Set<Long> visitedConnections,HashMap<Long,Integer> amountConnectionsUsed,GraphStructure graph) {
-        long waypointId = -1;
+        //long waypointId = -1;
         for (int i = connections.size()-1;i>=0;i--){
             //System.out.println(cijfer);
             //System.out.println(amountConnectionsUsed.get(cijfer));
-                if(waypointId == -1 && amountConnectionsUsed.get(graph.getConnection(connections.get(i)).getFrom()) >1)
+            //System.out.println("cola  "  + graph.getConnection(connections.get(i)).getFrom() + "   " + amountConnectionsUsed.get(graph.getConnection(connections.get(i)).getFrom()));
+                if(amountConnectionsUsed.get(graph.getConnection(connections.get(i)).getFrom()) >1)
                 {
-                    waypointId = graph.getConnection(connections.get(i)).getFrom();
+                    long waypointId = graph.getConnection(connections.get(i)).getFrom();
                     //System.out.println(waypointId);
                     //System.out.println(amountConnectionsUsed.get(waypointId));
                     Integer amountConnections = amountConnectionsUsed.get(waypointId) - 1;
                     amountConnectionsUsed.put(waypointId, amountConnections);
                     //System.out.println(amountConnectionsUsed.get(waypointId));
                     visitedConnections.remove(connections.get(i));
+                    i = 0;
+
                 }
                 else {
-                    if (!(waypointId == -1)) {
-                        waypointId = graph.getConnection(connections.get(i)).getFrom();
-                    } else {
+                    //if (!(waypointId == -1)) {
+                    //    waypointId = graph.getConnection(connections.get(i)).getFrom();
+                    //} else {
+                        //Integer amountConnections = amountConnectionsUsed.get(graph.getConnection(connections.get(i)).getFrom()) -1 ;
+                        //System.out.println("fanta  " + amountConnections);
                         //System.out.println("ok");
                         //Integer amountConnections = amountConnectionsUsed.get(graph.getConnection(connections.get(i)).getFrom()) ;
                         //System.out.println(amountConnections);
@@ -166,7 +194,7 @@ public class KAStarRouter implements PathFinder {
                         //} else {
                         //    amountConnectionsUsed.put(graph.getConnection(connections.get(i)).getFrom(), amountConnections);
                         //}
-                    }
+                    //}
                 }
             }
     }
@@ -204,7 +232,7 @@ public class KAStarRouter implements PathFinder {
 
         FringeEntry(List<Long> connections, double heuristicValue,double accumulatedCost) {
             this.connections = connections;
-            this.heuristicValue = heuristicValue;
+            this.heuristicValue = accumulatedCost;
             this.accumulatedCost = accumulatedCost;
         }
 

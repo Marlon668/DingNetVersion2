@@ -75,17 +75,18 @@ public class RoutingApplication extends Application {
         }
 
         // Use the routing algorithm to calculate the path for the mote
-        //List<GeoPosition> routeMote = this.pathFinder.retrievePath(graph, motePosition,destinationPosition);
-        List<GeoPosition> routeMote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,3).get(0).getRight();
+        List<GeoPosition> routeMote = this.pathFinder.retrievePath(graph, motePosition,destinationPosition).getRight();
+        //List<GeoPosition> routeMote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,1).get(0).getRight();
         //List<GeoPosition>route2Mote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,3).get(1).getRight();
         //System.out.println(routeMote.contains(route2Mote));
         //List<GeoPosition>route3Mote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,3).get(2).getRight();
         //System.out.println(route2Mote.contains(route3Mote));
         //System.out.println(routeMote.contains(route3Mote));
         //routeMote.remove();
+        //System.out.println(routeMote);
         this.routes.put(deviceEUI, routeMote);
 
-        int amtPositions = Math.min(routeMote.size() - 1, 1);
+        int amtPositions = Math.min(routeMote.size() - 1, 3);
         //if(!lastPositions.containsKey(deviceEUI)|| !lastPositions.get(deviceEUI).equals(motePosition))
         //{
         //    // Compose the reply packet: up to 24 bytes for now, which can store 2 geopositions (in float)

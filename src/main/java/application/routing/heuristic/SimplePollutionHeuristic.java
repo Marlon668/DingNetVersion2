@@ -2,6 +2,8 @@ package application.routing.heuristic;
 
 import application.pollution.PollutionGrid;
 import org.jxmapviewer.viewer.GeoPosition;
+import util.Connection;
+import util.GraphStructure;
 import util.MapHelper;
 
 
@@ -15,6 +17,7 @@ public class SimplePollutionHeuristic implements RoutingHeuristic {
         this.pollutionGrid = pollutionGrid;
     }
 
+
     @Override
     public double calculateAccumulatedCost(HeuristicEntry entry) {
         GeoPosition begin = entry.graph.getWayPoint(entry.connection.getFrom());
@@ -27,9 +30,34 @@ public class SimplePollutionHeuristic implements RoutingHeuristic {
                         (0.4 <= pollutionValue && pollutionValue < 0.6) ? 3 : 10;
 
         // The lower the pollution level, the better the heuristic
+        //System.out.println("pollutionValue" + pollutionValue);
         return (0.70*pollutionValue + 0.30*MapHelper.distance(begin,end)/0.350);
         //factor*MapHelper.distance(begin,end)*MapHelper.distance(begin,end);
     }
+
+    @Override
+    public double calculateCostConnection(Connection connection, GraphStructure graph)
+    {
+        GeoPosition begin = graph.getWayPoint(connection.getFrom());
+        GeoPosition end = graph.getWayPoint(connection.getTo());
+
+        double pollutionValue = this.pollutionGrid.getPollutionLevel(MapHelper.meanPosition(begin, end)).getPollutionFactor();
+        //System.out.println(pollutionValue);
+
+        // The lower the pollution level, the better the heuristic
+        return (0.70*pollutionValue + 0.30*MapHelper.distance(begin,end)/0.350);
+    }
+
+    @Override
+    public double calculateCostBetweenTwoNeighbours(GeoPosition begin, GeoPosition end)
+    {
+        double pollutionValue = this.pollutionGrid.getPollutionLevel(MapHelper.meanPosition(begin, end)).getPollutionFactor();
+        //System.out.println(pollutionValue);
+
+        // The lower the pollution level, the better the heuristic
+        return (0.70*pollutionValue + 0.30*MapHelper.distance(begin,end)/0.350);
+    }
+
     @Override
     public double calculateHeuristic(HeuristicEntry entry) {
         double accumulatedCost = calculateAccumulatedCost(entry);

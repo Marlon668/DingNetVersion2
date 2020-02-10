@@ -31,7 +31,7 @@
             <transmissionPower>14</transmissionPower>
             <spreadingFactor>11</spreadingFactor>
             <energyLevel>20</energyLevel>
-            <movementSpeed>1.0</movementSpeed>
+            <movementSpeed>3.0</movementSpeed>
             <startMovementOffset>0</startMovementOffset>
             <periodSendingPacket>30</periodSendingPacket>
             <startSendingOffset>10</startSendingOffset>
@@ -48,7 +48,7 @@
             <transmissionPower>14</transmissionPower>
             <spreadingFactor>11</spreadingFactor>
             <energyLevel>20</energyLevel>
-            <movementSpeed>1.0</movementSpeed>
+            <movementSpeed>3.0</movementSpeed>
             <startMovementOffset>0</startMovementOffset>
             <periodSendingPacket>30</periodSendingPacket>
             <startSendingOffset>2</startSendingOffset>
@@ -65,7 +65,7 @@
             <transmissionPower>14</transmissionPower>
             <spreadingFactor>11</spreadingFactor>
             <energyLevel>20</energyLevel>
-            <movementSpeed>1.0</movementSpeed>
+            <movementSpeed>3.0</movementSpeed>
             <startMovementOffset>0</startMovementOffset>
             <periodSendingPacket>30</periodSendingPacket>
             <startSendingOffset>13</startSendingOffset>
@@ -184,10 +184,10 @@
             </sensors>
             <path/>
             <userMoteState>true</userMoteState>
-            <destination id="35"/>
+            <destination id="649"/>
         </userMote>
         <userMote>
-            <devEUI>16122219312378297977</devEUI>
+            <devEUI>6122219312378297977</devEUI>
             <location>
                 <waypoint id="2"/>
             </location>
@@ -202,11 +202,11 @@
                 <sensor SensorType="GPS"/>
             </sensors>
             <path/>
-            <userMoteState>false</userMoteState>
+            <userMoteState>true</userMoteState>
             <destination id="1"/>
         </userMote>
         <userMote>
-            <devEUI>15869578781173100217</devEUI>
+            <devEUI>5869578781173100217</devEUI>
             <location>
                 <waypoint id="301"/>
             </location>
@@ -221,7 +221,7 @@
                 <sensor SensorType="GPS"/>
             </sensors>
             <path/>
-            <userMoteState>false</userMoteState>
+            <userMoteState>true</userMoteState>
             <destination id="35"/>
         </userMote>
     </motes>

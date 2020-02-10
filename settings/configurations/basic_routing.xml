@@ -40,7 +40,7 @@
             </sensors>
             <path/>
             <userMoteState>true</userMoteState>
-            <destination id="26"/>
+            <destination id="6"/>
         </userMote>
     </motes>
     <gateways>

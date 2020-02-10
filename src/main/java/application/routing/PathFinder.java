@@ -1,8 +1,10 @@
 package application.routing;
 
+import application.routing.heuristic.RoutingHeuristic;
 import org.jxmapviewer.viewer.GeoPosition;
 import util.GraphStructure;
 import util.Pair;
+import util.Path;
 
 import java.util.List;
 
@@ -15,6 +17,7 @@ public interface PathFinder {
      * @return A list of positions containing the path to the destination
      * @throws RuntimeException When no path existed between the starting and ending position.
      */
-    List<GeoPosition> retrievePath(GraphStructure graph, GeoPosition begin, GeoPosition end);
+    Pair<Double,List<GeoPosition>> retrievePath(GraphStructure graph, GeoPosition begin, GeoPosition end);
     List<Pair<Double,List<GeoPosition>>> retrieveKPaths(GraphStructure graph, GeoPosition begin, GeoPosition end,Integer amountBestPaths);
+    RoutingHeuristic getHeuristic();
 }

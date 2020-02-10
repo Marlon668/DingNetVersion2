@@ -1,6 +1,7 @@
 package application.routing;
 
 import application.Application;
+import application.routing.heuristic.SimplePollutionHeuristic;
 import be.kuleuven.cs.som.annotate.Model;
 import iot.Environment;
 import iot.SimulationRunner;
@@ -29,7 +30,7 @@ import java.util.stream.IntStream;
 
 public class RoutingApplicationNew extends Application {
     // The routes stored per device
-    private Map<Long, List<GeoPosition>> routes;
+    private Map<Long, Pair<Double,List<GeoPosition>>> routes;
 
     // The last recorded positions of the requesting user motes
     private Map<Long, GeoPosition> lastPositions;
@@ -42,18 +43,22 @@ public class RoutingApplicationNew extends Application {
 
     private MoteProbe moteProbe;
 
+    private RouteAnalyser pathAnalyser;
+
+    private final double BUFFERSIZE = 7;
+
     /**
      * A HashMap representing the buffers for the approach.
      */
     @Model
-    private List<List<Pair<Double,List<GeoPosition>>>> bufferKBestPaths;
+    private Map<Long,List<List<Pair<Double,List<GeoPosition>>>>> bufferKBestPaths;
 
     /**
      * Returns the algorithm buffers.
      * @return The algorithm buffers.
      */
     @Model
-    private List<List<Pair<Double,List<GeoPosition>>>> getBufferKBestPaths(){
+    private Map<Long,List<List<Pair<Double,List<GeoPosition>>>>> getBufferKBestPaths(){
         return this.bufferKBestPaths;
     }
 
@@ -62,8 +67,12 @@ public class RoutingApplicationNew extends Application {
      * @param kPaths The k best paths according with its accumulated cost
      */
     @Model
-    private void putKBestPathsBuffers(List<Pair<Double,List<GeoPosition>>> kPaths) {
-        this.bufferKBestPaths.add(kPaths);
+    private void putKBestPathsBuffers(long moteID, List<Pair<Double,List<GeoPosition>>> kPaths) {
+        if(this.bufferKBestPaths.get(moteID) == null)
+        {
+            this.bufferKBestPaths.put(moteID, new ArrayList<List<Pair<Double, List<GeoPosition>>>>());
+        }
+        this.bufferKBestPaths.get(moteID).add(kPaths);
     }
 
 
@@ -74,8 +83,11 @@ public class RoutingApplicationNew extends Application {
         this.lastPositions = new HashMap<>();
         this.graph = environment.getGraph();
         this.pathFinder = pathFinder;
-        bufferKBestPaths = new ArrayList<>();
+        bufferKBestPaths = new HashMap<>();
         this.moteProbe = new MoteProbe();
+        this.pathAnalyser = new RouteAnalyser(this.pathFinder.getHeuristic());
+
+
     }
 
 
@@ -84,7 +96,8 @@ public class RoutingApplicationNew extends Application {
      * @param message The message which contains the route request.
      */
     private void handleRouteRequest(LoraWanPacket message) {
-        System.out.println("h");
+        //
+        //out.println("h");
         var body = Arrays.stream(Converter.toObjectType(message.getPayload()))
             .skip(1) // Skip the first byte since this indicates the message type
             .collect(Collectors.toList());
@@ -110,18 +123,29 @@ public class RoutingApplicationNew extends Application {
             ByteBuffer byteBuffer = ByteBuffer.wrap(rawPositions);
 
             motePosition = new GeoPosition(byteBuffer.getFloat(0), byteBuffer.getFloat(4));
-            destinationPosition = routes.get(deviceEUI).get(routes.get(deviceEUI).size()-1);
+            destinationPosition = routes.get(deviceEUI).getRight().get(routes.get(deviceEUI).getRight().size()-1);
         }
 
         // Use the routing algorithm to calculate the K best paths for the mote
         //List<GeoPosition> routeMote=this.pathFinder.retrievePath(graph,motePosition,destinationPosition);
-        List<Pair<Double,List<GeoPosition>>> routeMote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,5);
-        putKBestPathsBuffers(routeMote);
-        List<GeoPosition> bestPath;
-        if(bufferKBestPaths.size()==5) {
-            bestPath = takeBestPath(bufferKBestPaths);
-            bufferKBestPaths = new ArrayList<>();
-            this.routes.put(deviceEUI, bestPath);
+        List<Pair<Double,List<GeoPosition>>> routeMote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,3);
+        putKBestPathsBuffers(deviceEUI,routeMote);
+        Pair<Double,List<GeoPosition>> bestPath;
+        if(bufferKBestPaths.get(deviceEUI).size()==BUFFERSIZE) {
+            bestPath = takeBestPath(bufferKBestPaths.get(deviceEUI));
+            bufferKBestPaths = new HashMap<>();
+            if(bestPath.getRight().size()>0) {
+                this.routes.put(deviceEUI, bestPath);
+            }
+            else{
+                bestPath = this.routes.get(deviceEUI);
+                //if(bestPath.getRight().size()>1)
+
+                    bestPath.getRight().remove(0);
+
+                //bestPath.getRight().remove(0);
+                this.routes.put(deviceEUI, bestPath);
+            }
         }
         else {
             if (routes.get(deviceEUI) == null) {
@@ -129,16 +153,19 @@ public class RoutingApplicationNew extends Application {
                 this.routes.put(deviceEUI, bestPath);
             } else {
                 bestPath = this.routes.get(deviceEUI);
-                bestPath.remove(0);
+                //if(bestPath.getRight().size()>1)
+
+                    bestPath.getRight().remove(0);
+
                 this.routes.put(deviceEUI, bestPath);
             }
         }
         //List<GeoPosition> bestPath =
-        // Compose the reply packet: up to 24 bytes for now, which can store 3 geopositions (in float)
-        int amtPositions = Math.min(bestPath.size() - 1, 1);
+        // Compose the reply packet: up to 24 bytes for now, which can store 1 geoposition (in float)
+        int amtPositions = Math.min(bestPath.getRight().size() - 1, 1);
         ByteBuffer payloadRaw = ByteBuffer.allocate(8 * amtPositions);
 
-        for (GeoPosition pos : bestPath.subList(1, amtPositions+1)) {
+        for (GeoPosition pos : bestPath.getRight().subList(1, amtPositions+1)) {
             payloadRaw.putFloat((float) pos.getLatitude());
             payloadRaw.putFloat((float) pos.getLongitude());
         }
@@ -154,12 +181,124 @@ public class RoutingApplicationNew extends Application {
         }
 
         // Send the reply (via MQTT) to the requesting device
+        //.println("gggggg   " + deviceEUI);
+        BasicMqttMessage routeMessage = new BasicMqttMessage(payload);
+        this.mqttClient.publish(Topics.getAppToNetServer(message.getReceiverEUI(), deviceEUI), routeMessage);
+    }
+
+    /**
+     * Handle a route request message by replying with (part of) the route to the requesting device.
+     * @param message The message which contains the route request.
+     */
+    private void handleRouteRequest2(LoraWanPacket message) {
+        //System.out.println("h");
+        var body = Arrays.stream(Converter.toObjectType(message.getPayload()))
+            .skip(1) // Skip the first byte since this indicates the message type
+            .collect(Collectors.toList());
+        long deviceEUI = message.getSenderEUI();
+
+        GeoPosition motePosition;
+        GeoPosition destinationPosition;
+
+        if (!lastPositions.containsKey(deviceEUI)) {
+            // This is the first request the mote has made for a route
+            //  -> both the current position as well as the destination of the mote are transmitted
+            byte[] rawPositions = new byte[16];
+            IntStream.range(0, 16).forEach(i -> rawPositions[i] = body.get(i));
+
+            ByteBuffer byteBuffer = ByteBuffer.wrap(rawPositions);
+            motePosition = new GeoPosition(byteBuffer.getFloat(0), byteBuffer.getFloat(4));
+            destinationPosition = new GeoPosition(byteBuffer.getFloat(8), byteBuffer.getFloat(12));
+        } else {
+            // The mote has already sent the initial request
+            //  -> only the current position of the mote is transmitted (the destination has been stored already)
+            byte[] rawPositions = new byte[8];
+            IntStream.range(0, 8).forEach(i -> rawPositions[i] = body.get(i));
+            ByteBuffer byteBuffer = ByteBuffer.wrap(rawPositions);
+
+            motePosition = new GeoPosition(byteBuffer.getFloat(0), byteBuffer.getFloat(4));
+            destinationPosition = routes.get(deviceEUI).getRight().get(routes.get(deviceEUI).getRight().size()-1);
+        }
+
+        // Use the routing algorithm to calculate the K best paths for the mote
+        //List<GeoPosition> routeMote=this.pathFinder.retrievePath(graph,motePosition,destinationPosition);
+        List<Pair<Double,List<GeoPosition>>> routeMote = this.pathFinder.retrieveKPaths(graph, motePosition, destinationPosition,5);
+        putKBestPathsBuffers(deviceEUI,routeMote);
+        Pair<Double,List<GeoPosition>> bestPath;
+        if(bufferKBestPaths.get(deviceEUI).size()==BUFFERSIZE) {
+            bestPath = takeBestPath(bufferKBestPaths.get(deviceEUI));
+            bufferKBestPaths = new HashMap<>();
+            if (bestPath.getRight().size() > 0) {
+                if (BUFFERSIZE > 1) {
+                    this.routes.remove(0);
+                    if (pathAnalyser.isBetterPath(this.routes.get(deviceEUI), bestPath)) {
+                        bestPath = this.routes.get(deviceEUI);
+                        //bestPath.getRight().remove(0);
+                        this.routes.put(deviceEUI, bestPath);
+                    }
+                }
+                else{
+                    bestPath = this.routes.get(deviceEUI);
+                    //if(bestPath.getRight().size()>1)
+
+                    bestPath.getRight().remove(0);
+
+                    //bestPath.getRight().remove(0);
+                    this.routes.put(deviceEUI, bestPath);
+                }
+            }
+            else{
+                bestPath = this.routes.get(deviceEUI);
+                //if(bestPath.getRight().size()>1)
+
+                bestPath.getRight().remove(0);
+
+                //bestPath.getRight().remove(0);
+                this.routes.put(deviceEUI, bestPath);
+            }
+
+        }
+
+        else {
+            if (routes.get(deviceEUI) == null) {
+                bestPath = this.pathFinder.retrievePath(graph,motePosition, destinationPosition);
+                this.routes.put(deviceEUI, bestPath);
+            } else {
+                bestPath = this.routes.get(deviceEUI);
+                bestPath.getRight().remove(0);
+                this.routes.put(deviceEUI, bestPath);
+            }
+        }
+        //List<GeoPosition> bestPath =
+        // Compose the reply packet: up to 24 bytes for now, which can store 1 geoposition (in float)
+        int amtPositions = Math.min(bestPath.getRight().size()-1, 2);
+        ByteBuffer payloadRaw = ByteBuffer.allocate(8 * amtPositions);
+
+        for (GeoPosition pos : bestPath.getRight().subList(1, amtPositions+1)) {
+            payloadRaw.putFloat((float) pos.getLatitude());
+            payloadRaw.putFloat((float) pos.getLongitude());
+        }
+
+        List<Byte> payload = new ArrayList<>();
+        for (byte b : payloadRaw.array()) {
+            payload.add(b);
+        }
+
+        // Update the position of the mote if it has changed since the previous time
+        if (!lastPositions.containsKey(deviceEUI) || !lastPositions.get(deviceEUI).equals(motePosition)) {
+            lastPositions.put(deviceEUI, motePosition);
+        }
+
+        // Send the reply (via MQTT) to the requesting device
+        //.println("gggggg   " + deviceEUI);
         BasicMqttMessage routeMessage = new BasicMqttMessage(payload);
         this.mqttClient.publish(Topics.getAppToNetServer(message.getReceiverEUI(), deviceEUI), routeMessage);
     }
 
 
-    private List<GeoPosition> takeBestPath(List<List<Pair<Double, List<GeoPosition>>>> bufferKBestPaths) {
+
+
+    private Pair<Double,List<GeoPosition>> takeBestPath(List<List<Pair<Double, List<GeoPosition>>>> bufferKBestPaths) {
         List<Pair<Double,List<GeoPosition>>> lastMeasure = bufferKBestPaths.get(bufferKBestPaths.size()-1);
         HashMap<Integer,Pair<Integer,Double>> average = new HashMap<>();
         for(int k = 0;k<= lastMeasure.size()-1;k++){
@@ -170,10 +309,9 @@ public class RoutingApplicationNew extends Application {
             {
                 for (int j = 0; j <= bufferKBestPaths.get(i).size()-1; j++)
                 {
-                    System.out.println(j);
                     if(containsList(bufferKBestPaths.get(i).get(j).getRight(),path.getRight()))
                     {
-                        System.out.println(k);
+                        //System.out.println(k);
                         int amount = average.get(k).getLeft() + 1;
                         double accumulatedCost = average.get(k).getRight() + bufferKBestPaths.get(i).get(j).getLeft();
                         average.put(k,new Pair(amount,accumulatedCost));
@@ -205,21 +343,23 @@ public class RoutingApplicationNew extends Application {
             it.remove();
         }
         double bestAverage = 1000000000;
-        List<GeoPosition> bestRoute = lastMeasure.get(0).getRight();
+        Pair<Double,List<GeoPosition>> bestRoute = lastMeasure.get(0);
         for (Pair<Integer,Double> o:PathsIdWithMostAppearances) {
             double averageCost = o.getRight()/mostappearances;
             if(averageCost < bestAverage)
             {
                 bestAverage = averageCost;
                 int index = o.getLeft();
-                bestRoute = lastMeasure.get(index).getRight();
+                bestRoute = lastMeasure.get(index);
             }
         };
         return bestRoute;
 
     }
+
+
     private boolean containsList(List<GeoPosition> list, List<GeoPosition> sublist) {
-            return Collections.indexOfSubList(list, sublist) != -1;
+        return Collections.indexOfSubList(list, sublist) != -1;
     }
 
 
@@ -230,7 +370,7 @@ public class RoutingApplicationNew extends Application {
      */
     public List<GeoPosition> getRoute(Mote mote) {
         if (routes.containsKey(mote.getEUI())) {
-            return routes.get(mote.getEUI());
+            return routes.get(mote.getEUI()).getRight();
         }
         return new ArrayList<>();
     }
@@ -245,12 +385,12 @@ public class RoutingApplicationNew extends Application {
         }
     }
 
-
     /**
      * Clean the cached routes and mote positions.
      */
     public void clean() {
         this.routes = new HashMap<>();
         this.lastPositions = new HashMap<>();
+        this.bufferKBestPaths = new HashMap<>();
     }
 }

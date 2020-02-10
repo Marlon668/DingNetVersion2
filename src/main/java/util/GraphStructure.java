@@ -183,7 +183,7 @@ public class GraphStructure {
 
     /**
      * Retrieve a list of connection Ids which have the given waypoint as source.
-     * @param wayPointId The waypiont at which the connections start.
+     * @param wayPointId The waypoint at which the connections start.
      * @return A list of connection Ids which all start at {@code wayPointId}.
      */
     public List<Long> getOutgoingConnectionsById(long wayPointId) {

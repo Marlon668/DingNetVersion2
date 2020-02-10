@@ -24,9 +24,9 @@ public interface Sender {
 
     /**
      *
-     * @return if the device stay already transmitting a packet
+     * @return if the device stay already transmitting a packet to the same device
      */
-    boolean isTransmitting();
+    boolean isTransmitting(long receiver);
 
     /**
      *
@@ -74,5 +74,7 @@ public interface Sender {
     /**
      * reset the sender to the initial state
      */
-    void reset();
+    void reset(long receiver);
+
+    void resetAll();
 }

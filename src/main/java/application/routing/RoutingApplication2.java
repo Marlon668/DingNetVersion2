@@ -49,7 +49,7 @@ public class RoutingApplication2 extends Application {
     private void setPath(Mote mote,GeoPosition destination)
     {
         GeoPosition beginPosition = environment.getMapHelper().toGeoPosition(mote.getXPosInt(),mote.getYPosInt());
-        List<GeoPosition> routeMote = this.pathFinder.retrievePath(graph,beginPosition,destination);
+        List<GeoPosition> routeMote = this.pathFinder.retrievePath(graph,beginPosition,destination).getRight();
         mote.setPath(routeMote);
         this.routes.put(mote.getEUI(),routeMote);
     }
@@ -74,7 +74,7 @@ public class RoutingApplication2 extends Application {
                 });
         }
         */
-        System.out.println("h");
+        //System.out.println("h");
         var body = Arrays.stream(Converter.toObjectType(message.getPayload()))
             .skip(1) // Skip the first byte since this indicates the message type
             .collect(Collectors.toList());
@@ -96,7 +96,7 @@ public class RoutingApplication2 extends Application {
             ByteBuffer byteBuffer = ByteBuffer.wrap(rawPositions);
             motePosition = new GeoPosition(byteBuffer.getFloat(0), byteBuffer.getFloat(4));
             destinationPosition = new GeoPosition(byteBuffer.getFloat(8), byteBuffer.getFloat(12));
-            routeMote = this.pathFinder.retrievePath(graph,motePosition,destinationPosition);
+            routeMote = this.pathFinder.retrievePath(graph,motePosition,destinationPosition).getRight();
             this.routes.put(deviceEUI,routeMote);
         }
         else {

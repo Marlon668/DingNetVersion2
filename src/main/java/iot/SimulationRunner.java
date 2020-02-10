@@ -27,10 +27,7 @@ import util.xml.*;
 import javax.sound.midi.SysexMessage;
 import java.io.File;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class SimulationRunner {
@@ -50,7 +47,7 @@ public class SimulationRunner {
     private PollutionMonitor pollutionMonitor;
     private NetworkServer networkServer;
 
-    private RoutingApplication2 routingApplication2;
+    private RoutingApplication routingApplication2;
 
 
 
@@ -68,7 +65,8 @@ public class SimulationRunner {
         QoS.putAdaptationGoal("energyConsumption", new ThresholdAdaptationGoal(0.0));
         QoS.putAdaptationGoal("collisionBound", new ThresholdAdaptationGoal(0.0));
 
-        simulation = new Simulation();
+        pollutionGrid = new PollutionGrid();
+        simulation = new Simulation(pollutionGrid);
         inputProfiles = loadInputProfiles();
 
         // Loading all the algorithms
@@ -88,6 +86,22 @@ public class SimulationRunner {
             }
         };
 
+        GenericFeedbackLoop information = new GenericFeedbackLoop("Get Information") {
+            @Override
+            public void adapt(Mote mote, Gateway gateway) {
+
+
+            }
+        };
+
+        GenericFeedbackLoop bestPath = new GenericFeedbackLoop("Best Path") {
+            @Override
+            public void adapt(Mote mote, Gateway gateway) {
+
+
+            }
+        };
+
         algorithms = new ArrayList<>();
         algorithms.add(noAdaptation);
 
@@ -99,6 +113,8 @@ public class SimulationRunner {
 
         //Airquality airqualityAdaptation = new Airquality();
         algorithms.add(airQuality);
+        algorithms.add(information);
+        algorithms.add(bestPath);
 
 
         /*
@@ -116,7 +132,6 @@ public class SimulationRunner {
         }
 
         networkServer = new NetworkServer(MQTTClientFactory.getSingletonInstance());
-        pollutionGrid = new PollutionGrid();
         environment = null;
     }
 
@@ -139,6 +154,10 @@ public class SimulationRunner {
         return simulation;
     }
 
+    public Map<Long,List<Double>> getInformation(){
+        return simulation.getInformation();
+    }
+
     public QualityOfService getQoS() {
         return QoS;
     }
@@ -157,7 +176,7 @@ public class SimulationRunner {
             .filter(o -> o.getName().equals(name))
             .findFirst()
             .orElseThrow(() -> new RuntimeException(String.format("Could not load approach with name %s", name)));
-        if(!(selectedAlgorithm.getName()=="No Adaptation"))
+        if(!(selectedAlgorithm.getName()=="No Adaptation" || selectedAlgorithm.getName()=="Best Path"))
         {
             for(Mote mote : environment.getMotes())
             {
@@ -169,6 +188,23 @@ public class SimulationRunner {
         }
 
         simulation.setApproach(selectedAlgorithm);
+        for(Mote mote: environment.getMotes())
+        {
+
+            //if (mote instanceof UserMote && ((UserMote) mote).isActive())
+            //{
+            //    MoteEffector moteEffector = new MoteEffector();
+            //    moteEffector.changePath(mote,new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),environment);
+            //}
+
+            if (mote instanceof UserMote && ((UserMote) mote).isActive() && selectedAlgorithm.getName() == "Best Path")
+            {
+                MoteEffector moteEffector = new MoteEffector();
+                BestPath bestpath = new BestPath(new SimplePollutionHeuristic(pollutionGrid));
+                bestpath.setInformation(simulation.getInformation());
+                moteEffector.bestPath(mote,bestpath,environment);
+            }
+        }
     }
 
     public void setEnvironment(Environment environment) {
@@ -242,7 +278,6 @@ public class SimulationRunner {
             long simulationStep = 0;
             while (!this.isSimulationFinished()) {
                 this.simulation.simulateStep();
-
                 // Visualize every x seconds
                 if (simulationStep++ % (updateFrequency.intValue() * 1000) == 0) {
                     listener.update();
@@ -315,6 +350,7 @@ public class SimulationRunner {
      */
     public void loadConfigurationFromFile(File file) {
         this.cleanupSimulation();
+        simulation.setInformation();
 
         ConfigurationReader.loadConfiguration(file, this);
         simulation.setEnvironment(new WeakReference<>(this.getEnvironment()));
@@ -366,13 +402,17 @@ public class SimulationRunner {
         this.pollutionMonitor = new PollutionMonitor(this.getEnvironment(), this.pollutionGrid);
         this.routingApplication = new RoutingApplicationNew(
            new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)), getEnvironment());
+        simulation.setRoutingApplicationNew(routingApplication);
         for(Mote mote: environment.getMotes())
         {
+
             if (mote instanceof UserMote && ((UserMote) mote).isActive())
             {
                 MoteEffector moteEffector = new MoteEffector();
                 moteEffector.changePath(mote,new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),environment);
             }
+
+
         }
         //this.routingApplication = new RoutingApplication2 (new KAStarRouter(new SimplePollutionHeuristic(pollutionGrid)),getEnvironment());
     }

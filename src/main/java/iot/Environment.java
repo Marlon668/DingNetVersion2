@@ -4,6 +4,7 @@ import be.kuleuven.cs.som.annotate.Basic;
 import iot.networkentity.Gateway;
 import iot.networkentity.Mote;
 import iot.networkentity.NetworkEntity;
+import iot.networkentity.UserMote;
 import org.jxmapviewer.viewer.GeoPosition;
 import util.Connection;
 import util.GraphStructure;
@@ -229,6 +230,10 @@ public class Environment implements Serializable {
     @Basic
     public void addMote(Mote mote) {
         // TODO check if coordinates are within valid bounds (although... is this really necessary?)
+        //if(mote instanceof UserMote)
+        //{
+        //   System.out.println(((UserMote) mote).isActive());
+        //}
         motes.add(mote);
     }
 
@@ -323,7 +328,7 @@ public class Environment implements Serializable {
         double xPosMote = mote.getXPosDouble();
         double yPosMote = mote.getYPosDouble();
 
-        if (xPosMote != xPosDest || yPosMote != yPosDest) {
+        //if (xPosMote != xPosDest || yPosMote != yPosDest) {
             double deltaX = (xPosDest - xPosMote);
             double deltaY = (yPosDest - yPosMote);
             double distance = Math.min(1, Math.sqrt(Math.pow(deltaX, 2) + Math.pow(deltaY, 2)));
@@ -333,7 +338,7 @@ public class Environment implements Serializable {
             yPosMote += distance * Math.sin(angle) * (yPosDest > yPosMote ? 1 : -1);
 
             mote.setPos(xPosMote, yPosMote);
-        }
+        //}
     }
 
 

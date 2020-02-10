@@ -475,7 +475,7 @@ public class MainGUI extends JFrame implements SimulationUpdateListener, Refresh
         mapViewer.setOverlayPainter(new CompoundPainterBuilder()
             .withPollutionGrid(environment, simulationRunner.getPollutionGrid())
             .withRoutingPath(environment, simulationRunner.getRoutingApplication())
-            .withMotePaths(environment)
+            .withMotePaths(environment,simulationRunner.getSimulation().getApproach())
             .withMotes(environment)
             .withGateways(environment)
             .build()

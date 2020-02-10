@@ -13,17 +13,14 @@ import org.jetbrains.annotations.NotNull;
 import util.Pair;
 import util.TimeHelper;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class SenderNoWaitPacket implements Sender {
 
     private RegionalParameter regionalParameter;
     private double transmissionPower;
-    private boolean isTransmitting;
+    private HashMap<Long,Boolean> isTransmitting;
     private final NetworkEntity sender;
     private final Environment env;
     /**
@@ -33,7 +30,7 @@ public class SenderNoWaitPacket implements Sender {
     private final Random random = new Random();
 
     public SenderNoWaitPacket(NetworkEntity sender, Environment environment) {
-        reset();
+        resetAll();
         this.env = environment;
         this.sender = sender;
     }
@@ -41,7 +38,8 @@ public class SenderNoWaitPacket implements Sender {
 
     @Override
     public Optional<LoraTransmission> send(@NotNull LoraWanPacket packet, @NotNull Set<Receiver> receivers) {
-        if (!isTransmitting) {
+        long receiver = packet.getReceiverEUI();
+        if (!isTransmitting(receiver)) {
             var payloadSize = packet.getPayload().length + packet.getFrameHeader().getFOpts().length;
             if (regionalParameter.getMaximumPayloadSize() < payloadSize) {
                 throw new IllegalArgumentException("Payload size greater then the max size. Payload size: " + payloadSize + ", " +
@@ -61,13 +59,13 @@ public class SenderNoWaitPacket implements Sender {
                 .map(Pair::getRight);
             filteredSet.forEach(p -> p.getLeft().receive(p.getRight()));
 
-            isTransmitting = true;
+            isTransmitting.put(receiver,true);
             var clock = env.getClock();
-            clock.addTriggerOneShot(clock.getTime().plusNanos((long) TimeHelper.miliToNano(timeOnAir)),
-                () -> isTransmitting = false);
+            clock.addTriggerOneShot(clock.getTime().plusNanos((long) TimeHelper.miliToNano(1)),
+                () -> isTransmitting.put(receiver,false));
             return ret;
         } else {
-            throw new IllegalStateException("impossible send two packet at the same time");
+            throw new IllegalStateException("impossible send two packet at the same time to the same device");
         }
     }
 
@@ -165,8 +163,11 @@ public class SenderNoWaitPacket implements Sender {
     }
 
     @Override
-    public boolean isTransmitting() {
-        return isTransmitting;
+    public boolean isTransmitting(long device) {
+        if ((this.isTransmitting.get(device)==null)) {
+            this.isTransmitting.put(device,false);
+        }
+        return this.isTransmitting.get(device);
     }
 
     @Override
@@ -207,7 +208,12 @@ public class SenderNoWaitPacket implements Sender {
     }
 
     @Override
-    public void reset() {
-        isTransmitting = false;
+    public void reset(long receiver) {
+        isTransmitting.put(receiver,false);
+    }
+
+    @Override
+    public void resetAll() {
+        isTransmitting = new HashMap<>();
     }
 }

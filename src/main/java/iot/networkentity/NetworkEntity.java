@@ -333,7 +333,7 @@ public abstract class NetworkEntity implements Serializable {
 
     public void reset() {
         receiver.reset();
-        sender.reset();
+        sender.resetAll();
 
         this.initialize();
     }

@@ -1,11 +1,13 @@
 package application.routing;
 
 import application.routing.heuristic.RoutingHeuristic;
-import application.routing.heuristic.RoutingHeuristic.HeuristicEntry;
-import application.routing.heuristic.SimplePollutionHeuristic;
+import iot.Environment;
+import iot.networkentity.UserMote;
 import org.jetbrains.annotations.NotNull;
 import org.jxmapviewer.viewer.GeoPosition;
+import util.Connection;
 import util.GraphStructure;
+import util.MapHelper;
 import util.Pair;
 
 import java.util.*;
@@ -15,49 +17,45 @@ import java.util.stream.Collectors;
 /**
  * An class which implements the A* routing algorithm, assuming the used heuristic is consistent.
  */
-public class AStarRouter implements PathFinder {
+public class BestPath{
 
     // The maximum amount of distance the closest waypoint should be to a given GeoPosition (in km)
     @SuppressWarnings("FieldCanBeLocal")
     private final double DISTANCE_THRESHOLD_POSITIONS = 0.05;
 
-    // The heuristic used in the A* algorithm
-    private RoutingHeuristic heuristic;
 
-    public RoutingHeuristic getHeuristic ()
+    private Map<Long,List<Double>> information;
+
+    public void setInformation(Map<Long,List<Double>> information)
     {
-        return this.heuristic;
+        this.information = information;
     }
 
-    @Override
-    public List<Pair<Double, List<GeoPosition>>> retrieveKPaths(GraphStructure graph, GeoPosition begin, GeoPosition end, Integer amountBestPaths) {
-        return null;
-    }
+    public BestPath(RoutingHeuristic heuristic) {
 
-    public AStarRouter(RoutingHeuristic heuristic) {
-        this.heuristic = heuristic;
     }
 
 
-    @Override
-    public Pair<Double,List<GeoPosition>>  retrievePath(GraphStructure graph, GeoPosition begin, GeoPosition end) {
+
+    public Pair<Double,List<GeoPosition>>  retrievePath(Environment environment, UserMote mote) {
+        GraphStructure graph = environment.getGraph();
+        GeoPosition begin = environment.getMapHelper().toGeoPosition(mote.getPosInt());
+        GeoPosition end = mote.getDestination();
+        double veloctiy = mote.getMovementSpeed();
         long beginWaypointId = graph.getClosestWayPointWithinRange(begin, DISTANCE_THRESHOLD_POSITIONS)
             .orElseThrow(() -> new IllegalStateException("The mote position retrieved from the message is not located at a waypoint."));
         long endWaypointId = graph.getClosestWayPointWithinRange(end, DISTANCE_THRESHOLD_POSITIONS)
             .orElseThrow(() -> new IllegalStateException("The destination position retrieved from the message is not located at a waypoint."));
 
-        Set<Long> visitedConnections = new HashSet<>();
 
         PriorityQueue<FringeEntry> fringe = new PriorityQueue<>();
         // Initialize the fringe by adding the first outgoing connections
         graph.getConnections().entrySet().stream()
             .filter(entry -> entry.getValue().getFrom() == beginWaypointId)
             .forEach(entry -> {
+                Pair<Double, Integer> value = calculateCostConnection(graph,0,veloctiy,entry.getKey());
                 fringe.add(new FringeEntry(
-                    List.of(entry.getKey()),
-                    this.heuristic.calculateHeuristic(new HeuristicEntry(graph, entry.getValue(), end))
-                ));
-                visitedConnections.add(entry.getKey());
+                    List.of(entry.getKey()),value.getRight(),value.getLeft()));
             });
 
 
@@ -65,7 +63,6 @@ public class AStarRouter implements PathFinder {
         while (!fringe.isEmpty()) {
             FringeEntry current = fringe.poll();
             long lastWaypointId = graph.getConnection(current.getLastConnectionId()).getTo();
-
             // Are we at the destination?
             if (lastWaypointId == endWaypointId) {
                 return new Pair(0,this.getPath(current.connections, graph));
@@ -75,20 +72,32 @@ public class AStarRouter implements PathFinder {
             // Explore the different outgoing connections from the last connection in the list
             // -> Add the new possible paths (together with their new heuristic values) to the fringe
             graph.getOutgoingConnectionsById(lastWaypointId).stream()
-                .filter(connId -> !visitedConnections.contains(connId)) // Filter out connections which we have already considered (since these were visited in a better path first)
+                .filter(connId ->!containsWaypoints(current.connections, connId, graph))
                 .forEach(connId -> {
                     List<Long> extendedPath = new ArrayList<>(current.connections);
                     extendedPath.add(connId);
+                    Pair<Double, Integer> value = calculateCostConnection(graph,current.time,veloctiy,connId);
 
                     double newHeuristicValue = current.heuristicValue
-                        + this.heuristic.calculateHeuristic(new HeuristicEntry(graph, graph.getConnection(connId), end));
+                        + value.getLeft();
 
-                    fringe.add(new FringeEntry(extendedPath, newHeuristicValue));
-                    visitedConnections.add(connId);
+                    fringe.add(new FringeEntry(extendedPath,value.getRight(), newHeuristicValue));
                 });
         }
 
         throw new RuntimeException(String.format("Could not find a path from {%s} to {%s}", begin.toString(), end.toString()));
+    }
+
+    private boolean containsWaypoints(List<Long> connections,Long connectionId,GraphStructure graph)
+    {
+        for(Long conn: connections)
+        {
+            if(graph.getConnection(conn).getFrom() == graph.getConnection(connectionId).getTo())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -111,17 +120,49 @@ public class AStarRouter implements PathFinder {
         return points;
     }
 
+    private Pair<Double, Integer> calculateCostConnection(GraphStructure graph, int time, double velocity, Long connectionId)
+    {
+        Connection connection = graph.getConnection(connectionId);
+        //System.out.println("ConnectionId: " + connectionId);
+        List<Double> values = information.get(connectionId);
+        GeoPosition begin = graph.getWayPoint(connection.getFrom());
+        GeoPosition end = graph.getWayPoint(connection.getTo());
+        double distance = MapHelper.distance(begin,end)*1000;
+        int period = 0;
+        if(!((distance % velocity) >= 0.5))
+        {
+            period = (int) (distance/velocity);
+            period += 1;
+        }
+        else {
+            period = (int) (distance / velocity);
+        }
+
+        period = period /4;
+
+        double value = 0;
+        for(int i=0; i<period; i++)
+        {
+            int j = i+time;
+            value += values.get(j);
+        }
+        //System.out.println(" Value/period: " + value/period);
+        return new Pair<Double, Integer>((value/period),time+period);
+    }
+
 
     /**
-     * Class used in the priority queue, providing an order for the A* algorithm based on the
+     * Class used in the priority queue, providing an order for the Best Path algorithm based on the
      * accumulated heuristic values for the evaluated path.
      */
     private static class FringeEntry implements Comparable<FringeEntry> {
         List<Long> connections;
+        int time;
         double heuristicValue;
 
-        FringeEntry(List<Long> connections, double heuristicValue) {
+        FringeEntry(List<Long> connections,int time, double heuristicValue) {
             this.connections = connections;
+            this.time = time;
             this.heuristicValue = heuristicValue;
         }
 

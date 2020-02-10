@@ -75,7 +75,7 @@ public class ConfigurePathPanel extends AbstractConfigurePanel {
             .withMotes(environment);
 
         if (currentMote == null) {
-            builder.withMotePaths(environment);
+            builder.withMotePaths(environment,null);
         }
 
         painter = builder.build();

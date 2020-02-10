@@ -18,10 +18,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Map;
+import java.util.*;
 
 public class ConfigurationReader {
     private static IdRemapping idRemapping = new IdRemapping();
@@ -167,6 +164,32 @@ public class ConfigurationReader {
                 int spreadingFactor = Integer.parseInt(XMLHelper.readChild(gatewayNode, "spreadingFactor"));
                 environment.addGateway(new Gateway(devEUI, xPos, yPos, transmissionPower, spreadingFactor, environment));
             }
+
+            // ---------------
+            //    Information
+            // ---------------
+
+            if (configuration.getElementsByTagName("information").getLength() != 0) {
+                Element information = (Element) configuration.getElementsByTagName("information").item(0);
+                Element connectionNode;
+
+                for (int i = 0; i < information.getElementsByTagName("connection").getLength(); i++) {
+                    List<Double> values = new ArrayList<>();
+                    connectionNode = (Element) information.getElementsByTagName("connection").item(i);
+                    long connectionId = Long.parseUnsignedLong(XMLHelper.readChild(connectionNode, "connectionId"));
+                    //System.out.println(connectionId);
+                    Element times = (Element) connectionNode.getElementsByTagName("times").item(0);
+                    var con = times.getElementsByTagName("time");
+                    for (int j = 0; j < con.getLength(); j++) {
+                        Element timeNode = (Element) con.item(j);
+                        //int time = Integer.parseInt(timeNode.getAttribute("time"));
+                        double value = Double.parseDouble(timeNode.getAttribute("Val"));
+                        values.add(values.size(),value);
+                    }
+                    simulationRunner.getSimulation().getInformation().put(connectionId,values);
+                }
+            }
+
         } catch (ParserConfigurationException | SAXException | IOException e1) {
             e1.printStackTrace();
         }

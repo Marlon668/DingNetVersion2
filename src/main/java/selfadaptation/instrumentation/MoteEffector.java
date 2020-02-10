@@ -1,5 +1,6 @@
 package selfadaptation.instrumentation;
 
+import application.routing.BestPath;
 import application.routing.PathFinder;
 import iot.Environment;
 import iot.networkentity.Mote;
@@ -59,7 +60,25 @@ public class MoteEffector {
     {
         if (mote instanceof  UserMote)
         {
-            List<GeoPosition> positions = pathFinder.retrievePath(environment.getGraph(),environment.getMapHelper().toGeoPosition(mote.getPosInt()),((UserMote) mote).getDestination());
+            List<GeoPosition> positions = pathFinder.retrievePath(environment.getGraph(),environment.getMapHelper().toGeoPosition(mote.getPosInt()),((UserMote) mote).getDestination()).getRight();
+            Path newPath = new Path(positions,environment.getGraph());
+            mote.setPath(newPath);
+        }
+
+    }
+
+    /**
+     * A method to change the path of a mote.
+     * Used in the method of noAdaptation
+     * @param mote The mote to change the path of.
+     * @param pathFinder The pathfinder that is used.
+     * @param environment The environment of simulation
+     */
+    public void bestPath(Mote mote, BestPath pathFinder, Environment environment)
+    {
+        if (mote instanceof  UserMote)
+        {
+            List<GeoPosition> positions = pathFinder.retrievePath(environment,(UserMote)mote).getRight();
             Path newPath = new Path(positions,environment.getGraph());
             mote.setPath(newPath);
         }

@@ -25,6 +25,7 @@ public class AddPositionToPath implements ConsumePacketStrategy {
         if ((packet.getPayload().length % BYTES_FOR_GEO_COORDINATE) != 0) {
             throw new IllegalStateException("the packet doesn't contain the correct amount of byte");
         }
+        //System.out.println("ttttttttt");
         var payload = packet.getPayload();
         final List<GeoPosition> path = new LinkedList<>();
         for (int i = 0; i+ BYTES_FOR_GEO_COORDINATE <= payload.length; i+= BYTES_FOR_GEO_COORDINATE) {

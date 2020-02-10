@@ -80,7 +80,7 @@ public class UserMote extends Mote {
     public void setPos(double xPos, double yPos) {
         super.setPos(xPos, yPos);
 
-        if(isAdaptation()) {
+        if (isAdaptation()) {
             Environment environment = this.getEnvironment();
 
             if (isActive()) {
@@ -94,13 +94,14 @@ public class UserMote extends Mote {
                 if (path.getDestination().isPresent() &&    //at least the path has one point
                     MapHelper.distance(path.getDestination().get(), destination) > DISTANCE_THRESHOLD_ROUNDING_ERROR &&
                     wayPoints.size() > 1 &&
-                    environment.getMapHelper().toMapCoordinate(wayPoints.get(wayPoints.size() - 2)).equals(getPosInt())) {
+                    environment.getMapHelper().toMapCoordinate(wayPoints.get(wayPoints.size()-1)).equals(getPosInt())) {
                     //require new part of path
                     askNewPartOfPath();
                 }
             }
         }
     }
+
 
     public void setAdaptaion(){
         this.adaptation = true;
@@ -110,7 +111,7 @@ public class UserMote extends Mote {
         return this.adaptation;
     }
 
-    private void askNewPartOfPath() {
+    public void askNewPartOfPath() {
         if (getPath().getDestination().isEmpty()) {
             throw new IllegalStateException("You can't require new part of path without a previous one");
         }
@@ -122,11 +123,22 @@ public class UserMote extends Mote {
 
         var clock = this.getEnvironment().getClock();
         var oldDestination = getPath().getDestination();
-        clock.addTriggerOneShot(clock.getTime().plusSeconds(30), () -> {
+        clock.addTriggerOneShot(clock.getTime().plusSeconds(10), () -> {
             if (oldDestination.equals(getPath().getDestination())) {
                 askNewPartOfPath();
             }
         });
+    }
+
+    public void sendAnotherWayPointOfPath(){
+        if (getPath().getDestination().isEmpty()) {
+            throw new IllegalStateException("You can't require new part of path without a previous one");
+        }
+        byte[] payload= new byte[9];
+        payload[0] = MessageType.REQUEST_UPDATE_PATH.getCode();
+        System.arraycopy(Converter.toByteArray(getPath().getDestination().get()), 0, payload, 1, 8);
+        sendToGateWay(new LoraWanPacket(getEUI(), getApplicationEUI(), payload,
+            new BasicFrameHeader().setFCnt(incrementFrameCounter()), new LinkedList<>()));
     }
 
     private SensorDataGenerator getGPSSensor() {
@@ -142,15 +154,15 @@ public class UserMote extends Mote {
      * @param active true to set active, false otherwise
      */
     public void setActive(boolean active) {
-        if (active) {
-            this.getEnvironment().getMotes().stream()
-                .filter(m -> m instanceof UserMote)
-                .map(m -> (UserMote)m)
-                .forEach(m -> {
-                    m.setActive(false);
-                    m.enable(false);
-                });
-        }
+        //if (active) {
+        //    this.getEnvironment().getMotes().stream()
+        //       .filter(m -> m instanceof UserMote)
+        //        .map(m -> (UserMote)m)
+        //        .forEach(m -> {
+        //            m.setActive(false);
+        //            m.enable(false);
+        //        });
+        //}
         isActive = active;
     }
 

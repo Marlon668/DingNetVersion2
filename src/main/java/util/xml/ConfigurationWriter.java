@@ -28,7 +28,7 @@ public class ConfigurationWriter {
 
 
     public static void saveConfigurationToFile(File file, SimulationRunner simulationRunner) {
-        idRemapping.reset();
+        //idRemapping.reset();
 
         try {
             Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
@@ -188,6 +188,38 @@ public class ConfigurationWriter {
                 gateways.appendChild(gatewayElement);
             }
 
+            // ---------------
+            //    Information
+            // ---------------
+
+            Element information = doc.createElement("information");
+
+            for (long connection : simulationRunner.getInformation().keySet()) {
+                Element informationElement = doc.createElement("connection");
+
+                Element connectionId = doc.createElement("connectionId");
+                connectionId.appendChild(doc.createTextNode(Long.toUnsignedString(connection)));
+
+                int time = 0;
+
+                Element timeElement = doc.createElement("times");
+
+                for(double value : simulationRunner.getInformation().get(connection))
+                {
+                    Element timeSubElement = doc.createElement("time");
+
+                    timeSubElement.setAttribute("Val", Double.toString(value));
+                    timeSubElement.setAttribute("time", Integer.toString(time));
+                    timeElement.appendChild(timeSubElement);
+                    time += 3;
+                }
+                informationElement.appendChild(connectionId);
+                informationElement.appendChild(timeElement);
+                information.appendChild(informationElement);
+
+
+            }
+
 
             // ---------------
             //    Data dump
@@ -199,6 +231,7 @@ public class ConfigurationWriter {
             rootElement.appendChild(gateways);
             rootElement.appendChild(wayPointsElement);
             rootElement.appendChild(connectionsElement);
+            rootElement.appendChild(information);
 
             // write the content into xml file
             TransformerFactory transformerFactory = TransformerFactory.newInstance();

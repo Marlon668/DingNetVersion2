@@ -43,7 +43,7 @@ public class PollutionMonitor extends Application {
             .flatMap(Arrays::stream) // Can do this here since we filter the IAQ sensor (we know it generates a single byte)
             .mapToDouble(b -> (b.intValue() - 1) / 4.0)
             .average()
-            .orElse(0.0);
+            .orElse(0);
     }
 
     /**
